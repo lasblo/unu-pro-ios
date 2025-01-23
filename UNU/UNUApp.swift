@@ -25,7 +25,7 @@ struct UNUApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ScooterControlsView()
         }
         .modelContainer(sharedModelContainer)
     }
