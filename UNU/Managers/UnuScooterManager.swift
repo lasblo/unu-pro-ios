@@ -144,15 +144,36 @@ class UnuScooterManager: NSObject, ObservableObject {
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
-        
-        // Optional: If you want to handle app lifecycle, set up observers here.
-        // setupAppLifecycleObservers()
+        setupAppLifecycleObservers()
     }
     
     deinit {
         stateUpdateTimer?.invalidate()
         stateUpdateTimer = nil
         cancellables.forEach { $0.cancel() }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                // If we’re disconnected and Bluetooth is on, start scanning again
+                if !self.isConnected, self.centralManager.state == .poweredOn {
+                    self.startScanning()
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Stop scanning when entering background
+        NotificationCenter.default
+            .publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in
+                self?.stopScanning()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Public Methods
@@ -571,7 +592,7 @@ extension UnuScooterManager: CBCentralManagerDelegate {
         print("📵 Disconnected: \(error?.localizedDescription ?? "No error")")
         if peripheral == self.scooter {
             isConnected = false
-            statusMessage = (error == nil) ? "Disconnected." : "Connection lost."
+            statusMessage = (error == nil) ? "Disconnected" : "Connection lost"
             self.scooter = nil
         }
     }
