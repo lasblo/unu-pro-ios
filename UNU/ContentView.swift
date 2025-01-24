@@ -877,6 +877,30 @@ extension UnuScooterManager: CBPeripheralDelegate {
 }
 
 
+struct BlinkingImage: View {
+    let systemName: String
+    let isBlinking: Bool
+    
+    @State private var isVisible = true
+    
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.title2)
+            .foregroundStyle(.yellow)
+            .opacity(isVisible ? 1 : 0.3)
+            .onChange(of: isBlinking) { newValue in
+                guard newValue else {
+                    isVisible = true
+                    return
+                }
+                // Start the repeating animation when blinking is enabled
+                withAnimation(Animation.easeInOut(duration: 0.5).repeatForever()) {
+                    isVisible.toggle()
+                }
+            }
+    }
+}
+
 struct ScooterControlsView: View {
     @StateObject private var scooterManager = UnuScooterManager()
     @State private var showBatteryDetails = false
@@ -983,11 +1007,10 @@ struct ScooterControlsView: View {
                         scooterManager.hazardLightsOn.toggle()
                     }) {
                         VStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.title2)
-                                .foregroundStyle(scooterManager.hazardLightsOn ? .red : .yellow)
+                            BlinkingImage(systemName: "exclamationmark.triangle.fill",
+                                         isBlinking: scooterManager.hazardLightsOn)
                                 .padding(.bottom, 2)
-                            Text("Enable Hazards")
+                            Text(scooterManager.hazardLightsOn ? "Disable Hazards" : "Enable Hazards")
                                 .font(.callout)
                                 .foregroundStyle(.white)
                         }
