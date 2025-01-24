@@ -17,10 +17,13 @@ class UnuScooterManager: NSObject, ObservableObject {
     @Published private(set) var isScanning = false
     @Published private(set) var isConnected = false
     @Published private(set) var isLocked = true
+    @Published private(set) var isPairing = false
+    @Published private(set) var needsPairing = false
     @Published private(set) var statusMessage = ""
     @Published private(set) var bluetoothState: CBManagerState = .unknown
     @Published private(set) var currentState: ScooterState = .disconnected
     @Published private(set) var pendingStartScan = false
+    
     
     @Published var hazardLightsOn = false
     
@@ -57,6 +60,9 @@ class UnuScooterManager: NSObject, ObservableObject {
     // Timers & Combine
     private var stateUpdateTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+    
+    // App storage
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     
     // MARK: - Services
     
@@ -160,8 +166,11 @@ class UnuScooterManager: NSObject, ObservableObject {
             .publisher(for: UIApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                // If we’re disconnected and Bluetooth is on, start scanning again
-                if !self.isConnected, self.centralManager.state == .poweredOn {
+                // Only auto-reconnect if we've completed onboarding and were previously connected
+                if self.hasCompletedOnboarding &&
+                   !self.isConnected &&
+                   self.centralManager.state == .poweredOn &&
+                   self.scooter != nil {
                     self.startScanning()
                 }
             }
@@ -177,6 +186,11 @@ class UnuScooterManager: NSObject, ObservableObject {
     }
     
     // MARK: - Public Methods
+    
+    func handlePostOnboardingConnection() {
+        hasCompletedOnboarding = true
+        startStateUpdateTimer()
+    }
     
     func startScanning() {
         pendingStartScan = true
@@ -292,6 +306,14 @@ class UnuScooterManager: NSObject, ObservableObject {
     }
     
     // MARK: - Private Helpers
+    
+    /// Handles the scooter being connected but not paired (encryption code incorrect/missing)
+    private func handleInsufficientEncryption() {
+        needsPairing = true
+        isPairing = true
+        statusMessage = "Please enter pairing code shown on scooter"
+        print("❌ Insufficient encryption")
+    }
     
     /// Wakes the scooter from hibernation if the hibernation characteristic is available
     private func wakeUpScooter() async {
@@ -439,7 +461,8 @@ class UnuScooterManager: NSObject, ObservableObject {
         if let scooter = scooter {
             switch scooter.state {
             case .connected:
-                if !isConnected {
+                if !isConnected && !needsPairing {
+                    // Only set connected if we don't need pairing
                     isConnected = true
                     resubscribeToCharacteristics()
                 }
@@ -505,32 +528,44 @@ extension UnuScooterManager: CBCentralManagerDelegate {
         bluetoothState = central.state
         print("centralManagerDidUpdateState: \(central.state.rawValue)")
         
+        // Only initiate scanning if there's a pending scan request
         if central.state == .poweredOn && pendingStartScan {
             pendingStartScan = false
             initiateScanning()
         }
         
+        print(isConnected)
+        
+        // Just update the status message based on Bluetooth state
         switch central.state {
-        case .poweredOn:
-            if !isConnected && !isScanning {
-                statusMessage = "Connecting..."
-            }
         case .poweredOff:
-            isConnected = false
-            scooter = nil
             statusMessage = "Please turn on Bluetooth"
-        case .unauthorized:
+            print("ℹ️ Bluetooth is off")
             isConnected = false
             scooter = nil
+        case .unauthorized:
             statusMessage = "Bluetooth permission required"
+            print("ℹ️ Bluetooth permission required")
+            isConnected = false
+            scooter = nil
         case .unsupported:
             statusMessage = "Bluetooth not supported"
+            print("❌ Bluetooth not supported")
         case .resetting:
             statusMessage = "Bluetooth is resetting"
+            print("❌ Bluetooth is resetting")
         case .unknown:
             statusMessage = "Bluetooth state unknown"
+            print("❌ Bluetooth state unknown")
+        case .poweredOn:
+            // Only show "Ready" if we're not already doing something
+            if !isConnected && !isScanning && !pendingStartScan {
+                statusMessage = "Ready"
+            }
+            print("ℹ️ Bluetooth is on")
         @unknown default:
             statusMessage = "Unknown Bluetooth state"
+            print("❌ Unknown Bluetooth state")
         }
     }
     
@@ -558,10 +593,9 @@ extension UnuScooterManager: CBCentralManagerDelegate {
     
     func centralManager(_ central: CBCentralManager,
                        didConnect peripheral: CBPeripheral) {
-        print("🔌 Connected to scooter!")
+        print("🔌 Initial connection to scooter established")
         peripheral.delegate = self
-        isConnected = true
-        statusMessage = "Connected"
+        statusMessage = "Verifying connection..."
         
         // Discover relevant services
         peripheral.discoverServices([
@@ -590,7 +624,7 @@ extension UnuScooterManager: CBCentralManagerDelegate {
                        didDisconnectPeripheral peripheral: CBPeripheral,
                        error: Error?) {
         print("📵 Disconnected: \(error?.localizedDescription ?? "No error")")
-        if peripheral == self.scooter {
+        if (peripheral == self.scooter && !isPairing) {
             isConnected = false
             statusMessage = (error == nil) ? "Disconnected" : "Connection lost"
             self.scooter = nil
@@ -709,8 +743,18 @@ extension UnuScooterManager: CBPeripheralDelegate {
                     error: Error?) {
         if let error = error {
             print("❌ Error reading characteristic value: \(error.localizedDescription)")
+            
+            if error.localizedDescription.contains("Encryption is insufficient") {
+                handleInsufficientEncryption()
+            }
             return
         }
+        
+        // If we get here, we have successful communication with the scooter
+        needsPairing = false
+        isPairing = false
+        isConnected = true
+        print("🔓 Pairing successful, connection established")
         
         guard let data = characteristic.value else {
             print("⚠️ No data for characteristic \(characteristic.uuid)")

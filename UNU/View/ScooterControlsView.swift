@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ScooterControlsView: View {
-    @StateObject private var scooterManager = UnuScooterManager()
+    @EnvironmentObject var scooterManager: UnuScooterManager
     @State private var showBatteryDetails = false
     
     // For the custom drag gesture on the lock slider
@@ -182,17 +182,6 @@ struct ScooterControlsView: View {
             }
             .padding(20)
         }
-        .onAppear {
-            // Start scanning once view appears if not connected
-            if !scooterManager.isConnected {
-                scooterManager.startScanning()
-            }
-            scooterManager.startStateUpdateTimer()
-        }
-        .onDisappear {
-            // Stop the state update timer if we leave this screen
-            scooterManager.stopStateUpdateTimer()
-        }
         // Battery details sheet
         .sheet(isPresented: $showBatteryDetails) {
             BatteryDetailsView(
@@ -212,6 +201,9 @@ struct ScooterControlsView: View {
             Button("Retry") {
                 scooterManager.restartAndLock()
             }
+        }
+        .onAppear() {
+            scooterManager.startScanning()
         }
     }
 }

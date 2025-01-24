@@ -10,6 +10,9 @@ import SwiftData
 
 @main
 struct UNUApp: App {
+    @StateObject private var scooterManager = UnuScooterManager()
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -25,7 +28,13 @@ struct UNUApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if !hasCompletedOnboarding {
+                WelcomeScreen(hasCompletedOnboarding: $hasCompletedOnboarding)
+                    .environmentObject(scooterManager)
+            } else {
+                ContentView()
+                    .environmentObject(scooterManager)
+            }
         }
         .modelContainer(sharedModelContainer)
     }
