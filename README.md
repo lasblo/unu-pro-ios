@@ -82,7 +82,7 @@ Contributions, bug reports, and feature requests are welcome! Feel free to open 
 
 ## License
 
-[MIT License](LICENSE) – Feel free to modify and distribute under the terms of the MIT license.
+[GNU General Public License v3.0](LICENSE) – Feel free to modify and distribute under the terms of the GNU General Public License v3.0.
 
 ---
 
