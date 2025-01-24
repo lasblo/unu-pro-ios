@@ -1,6 +1,6 @@
 //
 //  UNUApp.swift
-//  UNU
+//  unu pro
 //
 //  Created by Lasse on 23.01.25.
 //
@@ -25,7 +25,7 @@ struct UNUApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ScooterControlsView()
+            ContentView()
         }
         .modelContainer(sharedModelContainer)
     }
