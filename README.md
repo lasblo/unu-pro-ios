@@ -4,7 +4,9 @@ An unofficial yet fully native iOS app for controlling unu pro scooters. This pr
 
 > **Disclaimer**: This app is not affiliated with or endorsed by unu. Use it at your own risk.
 
-![app home screen](app.jpeg)
+<img src="home.jpeg" alt="drawing" width="150"/>
+<img src="battery.jpeg" alt="drawing" width="150"/>
+<img src="lockfail.jpeg" alt="drawing" width="150"/>
 
 ## Motivation
 
