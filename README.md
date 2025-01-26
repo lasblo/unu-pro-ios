@@ -4,6 +4,8 @@ An unofficial yet fully native iOS app for controlling unu pro scooters. This pr
 
 > **Disclaimer**: This app is not affiliated with or endorsed by unu. Use it at your own risk.
 
+![app home screen](app.jpeg)
+
 ## Motivation
 
 The inspiration behind this project comes entirely from the excellent open-source work of [reunu/tech-reference](https://github.com/reunu/tech-reference) and the Flutter app [reunu/unustasis](https://github.com/reunu/unustasis). While **unustasis** is an impressive accomplishment, I encountered a few reliability issues in practice. Consequently, I decided to build a native Swift alternative to provide a more robust scooter-connection flow.
